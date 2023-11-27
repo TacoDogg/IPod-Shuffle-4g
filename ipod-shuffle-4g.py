@@ -14,6 +14,7 @@ import shutil
 import re
 import tempfile
 import signal
+from os.path import expanduser
 
 # External libraries
 try:
@@ -97,7 +98,7 @@ def group_tracks_by_id3_template(tracks, template):
     return sorted(grouped_tracks_dict.items())
 
 class Text2Speech(object):
-    valid_tts = {'pico2wave': True, 'RHVoice': True, 'espeak': True, 'say': True}
+    valid_tts = {'pico2wave': True, 'RHVoice': True, 'espeak': True, 'say': True, 'mimic3': True}
 
     @staticmethod
     def check_support():
@@ -109,6 +110,15 @@ class Text2Speech(object):
             print("Warning: macOS say not found, voicever won't be generated using it.")
         else:
             voiceoverAvailable = True
+            print("Using Siri for voiceover")
+        
+        #Check for mimic3
+        if not exec_exists_in_path("mimic3"):
+            Text2Speech.valid_tts['mimic3'] = False
+            print("Warning: mimic3 not found, voiceover won't be generated using it.")
+        else:
+            voiceoverAvailable = True
+            print("Using mimic3 for voiceover")
 
         # Check for pico2wave voiceover
         if not exec_exists_in_path("pico2wave"):
@@ -116,6 +126,7 @@ class Text2Speech(object):
             print("Warning: pico2wave not found, voicever won't be generated using it.")
         else:
             voiceoverAvailable = True
+            print("Using pico2wave for voiceover")
 
         # Check for espeak voiceover
         if not exec_exists_in_path("espeak"):
@@ -123,6 +134,7 @@ class Text2Speech(object):
             print("Warning: espeak not found, voicever won't be generated using it.")
         else:
             voiceoverAvailable = True
+            print("Using espeak for voiceover")
 
         # Check for Russian RHVoice voiceover
         if not exec_exists_in_path("RHVoice"):
@@ -130,6 +142,7 @@ class Text2Speech(object):
             print("Warning: RHVoice not found, Russian voicever won't be generated.")
         else:
             voiceoverAvailable = True
+            print("Using RHVoice for voiceover")
 
         # Return if we at least found one voiceover program.
         # Otherwise this will result in silent voiceover for tracks and "Playlist N" for playlists.
@@ -155,6 +168,8 @@ class Text2Speech(object):
             elif Text2Speech.espeak(out_wav_path, text):
                 return True
             elif Text2Speech.say(out_wav_path, text):
+                return True
+            elif Text2Speech.mimic3(out_wav_path, text):
                 return True
             else:
                 return False
@@ -203,6 +218,16 @@ class Text2Speech(object):
 
         os.remove(tmp_file.name)
         return True
+    
+    @staticmethod
+    def mimic3(out_wav_path, unicodetext):
+        if not Text2Speech.valid_tts['mimic3']:
+            return False
+        mimicOutputPath = expanduser("~") + "/.mimicTmp"
+        textWithId = "1|" + unicodetext
+        subprocess.call(['mimic3', '--output-dir', mimicOutputPath, '--output-naming', 'id', textWithId])
+        filePath = mimicOutputPath + '/1.wav'
+        shutil.move(filePath, out_wav_path)
 
 
 class Record(object):
