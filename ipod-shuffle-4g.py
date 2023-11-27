@@ -112,7 +112,7 @@ class Text2Speech(object):
             voiceoverAvailable = True
             print("Using Siri for voiceover")
         
-        #Check for mimic3
+        #Check for mimic3 voiceover
         if not exec_exists_in_path("mimic3"):
             Text2Speech.valid_tts['mimic3'] = False
             print("Warning: mimic3 not found, voiceover won't be generated using it.")
@@ -163,13 +163,13 @@ class Text2Speech(object):
         if lang == "ru-RU":
             return Text2Speech.rhvoice(out_wav_path, text)
         else:
-            if Text2Speech.pico2wave(out_wav_path, text):
+            if Text2Speech.mimic3(out_wav_path, text):
+                return True
+            elif Text2Speech.pico2wave(out_wav_path, text):
                 return True
             elif Text2Speech.espeak(out_wav_path, text):
                 return True
             elif Text2Speech.say(out_wav_path, text):
-                return True
-            elif Text2Speech.mimic3(out_wav_path, text):
                 return True
             else:
                 return False
@@ -220,14 +220,14 @@ class Text2Speech(object):
         return True
     
     @staticmethod
-    def mimic3(out_wav_path, unicodetext):
-        if not Text2Speech.valid_tts['mimic3']:
+    def mimic3(out_wav_path, unicodetext): #Define the function
+        if not Text2Speech.valid_tts['mimic3']: #If it isn't a valid TTS, refuse to use.
             return False
-        mimicOutputPath = expanduser("~") + "/.mimicTmp"
-        textWithId = "1|" + unicodetext
-        subprocess.call(['mimic3', '--output-dir', mimicOutputPath, '--output-naming', 'id', textWithId])
-        filePath = mimicOutputPath + '/1.wav'
-        shutil.move(filePath, out_wav_path)
+        mimicOutputPath = expanduser("~") + "/.mimicTmp" #Get user's home path and set up a temp folder for mimic's audio files before they're moved.
+        textWithId = "1|" + unicodetext #Add ID to text to speak, so that Mimic has a consistant output.
+        subprocess.call(['mimic3', '--output-dir', mimicOutputPath, '--output-naming', 'id', textWithId]) #Call mimic. This is essentially a shell command, with arguents comma-delimeted. 
+        filePath = mimicOutputPath + '/1.wav' #Set the file path to move from. Is the path to the temp folder with an extra /1.wav (The 1 is the ID I talked about earlier)
+        shutil.move(filePath, out_wav_path) #Move the file to wherever it needs to go.
 
 
 class Record(object):
