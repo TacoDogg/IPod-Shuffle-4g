@@ -374,7 +374,7 @@ class TrackHeader(Record):
             output += struct.pack("I", self.base_offset + self["total_length"] + len(track_chunk))
             track_chunk += track.construct()
             Progress().update(constructTracks, advance=1)
-            return output + track_chunk
+        return output + track_chunk
 
 class Track(Record):
 
