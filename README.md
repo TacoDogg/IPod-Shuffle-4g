@@ -52,6 +52,7 @@ optional arguments:
 
 This script requires:
 * [Python 3](https://www.python.org/download/releases/3.0/)
+* [Rich] (https://github.com/Textualize/rich) or ```pip install rich```
 
 Optional album/artist and auto-id3-playlists support:
 * [Mutagen](https://code.google.com/p/mutagen/)
