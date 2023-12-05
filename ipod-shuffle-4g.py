@@ -15,6 +15,10 @@ import re
 import tempfile
 import signal
 from os.path import expanduser
+import time
+import rich
+from rich.progress import Progress
+
 
 # External libraries
 try:
@@ -110,7 +114,7 @@ class Text2Speech(object):
             print("Warning: macOS say not found, voicever won't be generated using it.")
         else:
             voiceoverAvailable = True
-            print("Using Siri for voiceover")
+            print("Say command found.")
         
         #Check for mimic3 voiceover
         if not exec_exists_in_path("mimic3"):
@@ -118,7 +122,7 @@ class Text2Speech(object):
             print("Warning: mimic3 not found, voiceover won't be generated using it.")
         else:
             voiceoverAvailable = True
-            print("Using mimic3 for voiceover")
+            print("Mimic3 found.")
 
         # Check for pico2wave voiceover
         if not exec_exists_in_path("pico2wave"):
@@ -126,7 +130,7 @@ class Text2Speech(object):
             print("Warning: pico2wave not found, voicever won't be generated using it.")
         else:
             voiceoverAvailable = True
-            print("Using pico2wave for voiceover")
+            print("pico2wave found.")
 
         # Check for espeak voiceover
         if not exec_exists_in_path("espeak"):
@@ -134,7 +138,7 @@ class Text2Speech(object):
             print("Warning: espeak not found, voicever won't be generated using it.")
         else:
             voiceoverAvailable = True
-            print("Using espeak for voiceover")
+            print("eSpeak found.")
 
         # Check for Russian RHVoice voiceover
         if not exec_exists_in_path("RHVoice"):
@@ -142,7 +146,7 @@ class Text2Speech(object):
             print("Warning: RHVoice not found, Russian voicever won't be generated.")
         else:
             voiceoverAvailable = True
-            print("Using RHVoice for voiceover")
+            print("RHVoice found.")
 
         # Return if we at least found one voiceover program.
         # Otherwise this will result in silent voiceover for tracks and "Playlist N" for playlists.
@@ -161,15 +165,20 @@ class Text2Speech(object):
             text = str(text, 'utf-8')
         lang = Text2Speech.guess_lang(text)
         if lang == "ru-RU":
+            verboseprint('[*] [RHVoice] Generating voiceover...')
             return Text2Speech.rhvoice(out_wav_path, text)
         else:
             if Text2Speech.mimic3(out_wav_path, text):
+                verboseprint('[*] [Mimic] Generating voiceover...')
                 return True
             elif Text2Speech.pico2wave(out_wav_path, text):
+                verboseprint('[*] [pico2wave] Generating voiceover...')
                 return True
             elif Text2Speech.espeak(out_wav_path, text):
+                verboseprint('[*] [eSpeak] Generating voiceover...')
                 return True
             elif Text2Speech.say(out_wav_path, text):
+                verboseprint('[*] [Say] Generating voiceover...')
                 return True
             else:
                 return False
@@ -221,13 +230,11 @@ class Text2Speech(object):
     
     @staticmethod
     def mimic3(out_wav_path, unicodetext): #Define the function
-        if not Text2Speech.valid_tts['mimic3']: #If it isn't a valid TTS, refuse to use.
-            return False
-        mimicOutputPath = expanduser("~") + "/.mimicTmp" #Get user's home path and set up a temp folder for mimic's audio files before they're moved.
-        textWithId = "1|" + unicodetext #Add ID to text to speak, so that Mimic has a consistant output.
-        subprocess.call(['mimic3', '--output-dir', mimicOutputPath, '--output-naming', 'id', textWithId]) #Call mimic. This is essentially a shell command, with arguents comma-delimeted. 
-        filePath = mimicOutputPath + '/1.wav' #Set the file path to move from. Is the path to the temp folder with an extra /1.wav (The 1 is the ID I talked about earlier)
-        shutil.move(filePath, out_wav_path) #Move the file to wherever it needs to go.
+        if not Text2Speech.valid_tts['mimic3']: #If it isn't in the valid TTS array, 
+            return False #refuse to generate.
+        outputFolder = os.path.dirname(out_wav_path) #Get just the folder of a path. e.g. /media/tacodogg/iPod/iTunes_Control/Speakable/bv00.wav >>> /media/tacodogg/iPod/iTunes_Control/Speakable/ 
+        textWithFilename = os.path.basename(out_wav_path) + "|" + unicodetext #Add filename to text to speak, seperated by the '|' character.
+        subprocess.call(['mimic3', '--output-dir', outputFolder, '--output-naming', 'id', textWithFilename], stdout=open(os.devnull, 'wb'), stderr=open(os.devnull, 'wb')) #Call mimic. This is essentially a shell command, with arguents comma-delimeted. The stdout/stderr=open bit is suppressing the verbosity of Mimic3 (it breaks the progress bars).
 
 
 class Record(object):
@@ -359,13 +366,15 @@ class TrackHeader(Record):
 
         # Construct the underlying tracks
         track_chunk = bytes()
+        constructTracks = Progress().add_task("[green]Adding tracks to database...", total=len(self.tracks))
         for i in self.tracks:
             track = Track(self)
             verboseprint("[*] Adding track", i)
             track.populate(i)
             output += struct.pack("I", self.base_offset + self["total_length"] + len(track_chunk))
             track_chunk += track.construct()
-        return output + track_chunk
+            Progress().update(constructTracks, advance=1)
+            return output + track_chunk
 
 class Track(Record):
 
@@ -789,7 +798,7 @@ if __name__ == '__main__':
     result = parser.parse_args()
 
     # Enable verbose printing if desired
-    verboseprint = print if result.verbose else lambda *a, **k: None
+    verboseprint = rich.print if result.verbose else lambda *a, **k: None
 
     checkPathValidity(result.path)
 
