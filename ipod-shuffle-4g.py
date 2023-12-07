@@ -16,11 +16,17 @@ import tempfile
 import signal
 from os.path import expanduser
 import time
-import rich
-from rich.progress import Progress
-
-
-# External libraries
+#External libraries:
+try:
+    import rich
+except ImportError:
+    print("ERROR: Rich is required to run this script! Rich can be installed with 'python -m pip install rich', or from source at https://github.com/textualize/rich")
+    exit()
+try:
+    from rich.progress import Progress
+except ImportError:
+    print("ERROR: Rich is required to run this script! Rich can be installed with 'python -m pip install rich', or from source at https://github.com/textualize/rich")
+    exit()
 try:
     import mutagen
 except ImportError:
@@ -366,14 +372,15 @@ class TrackHeader(Record):
 
         # Construct the underlying tracks
         track_chunk = bytes()
-        constructTracks = Progress().add_task("[green]Adding tracks to database...", total=len(self.tracks))
-        for i in self.tracks:
-            track = Track(self)
-            verboseprint("[*] Adding track", i)
-            track.populate(i)
-            output += struct.pack("I", self.base_offset + self["total_length"] + len(track_chunk))
-            track_chunk += track.construct()
-            Progress().update(constructTracks, advance=1)
+        with Progress() as progress:
+            constructTracks = progress.add_task("[green]Adding tracks to database...", total=len(self.tracks))
+            for i in self.tracks:
+                track = Track(self)
+                verboseprint("[*] Adding track", i)
+                track.populate(i)
+                output += struct.pack("I", self.base_offset + self["total_length"] + len(track_chunk))
+                track_chunk += track.construct()
+                progress.update(constructTracks, advance=1)
         return output + track_chunk
 
 class Track(Record):
@@ -442,7 +449,7 @@ class Track(Record):
                     self.albums.append(album)
 
                 if audio.get("title", "") and audio.get("artist", ""):
-                    text = " - ".join(audio.get("title", "") + audio.get("artist", ""))
+                    text = ", by ".join(audio.get("title", "") + audio.get("artist", ""))
 
         # Handle the VoiceOverData
         if isinstance(text, str):
