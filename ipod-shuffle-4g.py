@@ -108,7 +108,7 @@ def group_tracks_by_id3_template(tracks, template):
     return sorted(grouped_tracks_dict.items())
 
 class Text2Speech(object):
-    valid_tts = {'pico2wave': True, 'RHVoice': True, 'espeak': True, 'say': True, 'mimic3': True}
+    valid_tts = {'pico2wave': True, 'RHVoice': True, 'espeak': True, 'say': True, 'mimic3': True, 'gtts': True}
 
     @staticmethod
     def check_support():
@@ -144,6 +144,14 @@ class Text2Speech(object):
             print("Warning: espeak not found, voicever won't be generated using it.")
         else:
             voiceoverAvailable = True
+
+        # Check for gtts-cli voiceover
+        # https://github.com/pndurette/gTTS
+        if not exec_exists_in_path("gtts-cli"):
+            Text2Speech.valid_tts['gtts-cli'] = False
+            print("Warning: gtts-cli not found, voicever won't be generated using it.")
+        else:
+            voiceoverAvailable = True
             print("eSpeak found.")
 
         # Check for Russian RHVoice voiceover
@@ -174,8 +182,8 @@ class Text2Speech(object):
             verboseprint('[*] [RHVoice] Generating voiceover...')
             return Text2Speech.rhvoice(out_wav_path, text)
         else:
-            if Text2Speech.mimic3(out_wav_path, text):
-                verboseprint('[*] [Mimic] Generating voiceover...')
+            if Text2Speech.gtts(out_wav_path, text):
+                verboseprint('[*] [gTTS] Generating voiceover...')
                 return True
             elif Text2Speech.pico2wave(out_wav_path, text):
                 verboseprint('[*] [pico2wave] Generating voiceover...')
@@ -185,6 +193,9 @@ class Text2Speech(object):
                 return True
             elif Text2Speech.say(out_wav_path, text):
                 verboseprint('[*] [Say] Generating voiceover...')
+                return True
+            elif Text2Speech.mimic3(out_wav_path, text):
+                verboseprint("[*] [mimic3] Generating voiceover...")
                 return True
             else:
                 return False
@@ -209,6 +220,19 @@ class Text2Speech(object):
         if not Text2Speech.valid_tts['say']:
             return False
         subprocess.call(["say", "-o", out_wav_path, '--data-format=LEI16', '--file-format=WAVE', '--', unicodetext])
+        return True
+
+    @staticmethod
+    def gtts(out_wav_path, unicodetext):
+        if not Text2Speech.valid_tts['gtts']:
+            return False
+        tmp_mp3_file = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
+        tmp_mp3_file.close()
+        tmp_wav_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
+        tmp_wav_file.close()
+        subprocess.call(["gtts-cli", "--lang", "en", unicodetext, "--output", tmp_mp3_file.name])
+        subprocess.call(["ffmpeg", "-y", "-loglevel", "error", "-hide_banner", "-nostats", "-i", tmp_mp3_file.name, tmp_wav_file.name])
+        subprocess.call(["mv", tmp_wav_file.name, out_wav_path])
         return True
 
     @staticmethod
